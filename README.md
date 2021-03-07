@@ -2,7 +2,7 @@
 
 This app is a plugin for `kubectl`, it allows you to duplicate a running Pod and auto-exec into. The list of Pods is filterable, and you can select the namespace you want.
 
-You can also set this parameters for customization of the duplicata:
+You can also set these parameters for customization of the duplicata:
  - `cpu`
  - `memory`
  - `ttl`
