@@ -8,6 +8,8 @@ You can also set this parameters for customization of the duplicata:
  - `ttl`
  - `shell`
 
+Already created duplicatas remain 4h (by default) and you can exec into them as long they're running.
+
 ## Requirements
 
 ### For build
@@ -41,7 +43,7 @@ Flags:
 
 ### Install
 
-TODO
+Download latest release from https://github.com/qonto/kubectl-duplicate/releases and extract `kubectl-duplicate` into your `/usr/loca/bin` and run `chmod -x /usr/local/bin/kubectl-duplicate`.
 
 ### Build
 
@@ -69,7 +71,7 @@ xattr -d com.apple.quarantine /usr/local/bin/kubectl-duplicate
         falcosidekick-5f44cb5bff-jh9wk
     ```
 
-* List pods with already duplicata created:
+* List pods with already created duplicatas:
 
     ```shell
     Search: █
