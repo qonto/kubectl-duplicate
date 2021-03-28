@@ -2,7 +2,6 @@ package create
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/qonto/kubectl-duplicate/pkg/config"
@@ -20,15 +19,16 @@ func Job(clientset *kubernetes.Clientset, config config.Configuration, deploymen
 	execAction.Command = []string{"true"}
 	probe := new(corev1.Probe)
 	probe.Handler.Exec = execAction
-	probe.InitialDelaySeconds = int32(3)
+	probe.InitialDelaySeconds = int32(*config.TTL)
 
 	container.Name = deployment.ObjectMeta.Name + "-exec"
-	container.Command = []string{"/bin/sh", "-c", "--"}
-	container.Args = []string{"sleep " + fmt.Sprint(*config.TTL) + ";"}
+	container.Command = []string{"/bin/sh", "-c", "--", "/bin/sh"}
 	container.Ports = []corev1.ContainerPort{}
 	container.VolumeMounts = []corev1.VolumeMount{}
 	container.LivenessProbe = probe
 	container.ReadinessProbe = probe
+	container.Stdin = true
+	container.TTY = true
 
 	if *config.CPU != "" {
 		container.Resources.Limits["cpu"] = resource.MustParse(*config.CPU)
@@ -39,9 +39,13 @@ func Job(clientset *kubernetes.Clientset, config config.Configuration, deploymen
 		container.Resources.Requests["memory"] = resource.MustParse(*config.Memory)
 	}
 
-	var ttlAfterFinished, backoffLimit int32
-	ttlAfterFinished = 300
-	backoffLimit = 1
+	var backoffLimit int32
+	var activeDeadlineSeconds, terminationGracePeriodSeconds int64
+	var ttlAfterFinished int32
+	activeDeadlineSeconds = int64(*config.TTL)
+	ttlAfterFinished = int32(3600)
+	backoffLimit = 0
+	terminationGracePeriodSeconds = 1
 
 	endAt := time.Now().Local().Add(time.Duration(*config.TTL) * time.Second)
 
@@ -56,6 +60,7 @@ func Job(clientset *kubernetes.Clientset, config config.Configuration, deploymen
 			},
 		},
 		Spec: batchv1.JobSpec{
+			ActiveDeadlineSeconds:   &activeDeadlineSeconds,
 			TTLSecondsAfterFinished: &ttlAfterFinished,
 			BackoffLimit:            &backoffLimit,
 			Template: corev1.PodTemplateSpec{
@@ -69,8 +74,9 @@ func Job(clientset *kubernetes.Clientset, config config.Configuration, deploymen
 					},
 				},
 				Spec: corev1.PodSpec{
-					Containers:    []corev1.Container{container},
-					RestartPolicy: corev1.RestartPolicyNever,
+					Containers:                    []corev1.Container{container},
+					RestartPolicy:                 corev1.RestartPolicyNever,
+					TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 				},
 			},
 		},

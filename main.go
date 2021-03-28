@@ -26,7 +26,6 @@ func init() {
 	config.TTL = kingpin.Flag("ttl", "Time to live of pods is seconds").Short('t').Default("14400").Int32()
 	config.Namespace = kingpin.Flag("namespace", "Namespace").Short('n').Default("default").String()
 	config.Pod = kingpin.Flag("pod", "Pod").Short('p').String()
-	config.Shell = kingpin.Flag("shell", "Shell to use").Short('s').Default("sh").String()
 	config.CPU = kingpin.Flag("cpu", "cpu").Short('c').String()
 	config.Memory = kingpin.Flag("memory", "Memory").Short('m').String()
 	config.Kubeconfig = kingpin.Flag("kubeconfig", "Kube config file (override by env var KUBECONFIG").Short('k').Default(os.Getenv("HOME") + "/.kube/config").ExistingFile()
@@ -74,19 +73,16 @@ func main() {
 		pod = selector.Pod(list.Pods(clientset, config), result.Name)
 	}
 
-	startShell(pod.Name, config.Namespace)
+	startShell(pod.Name, container.Name, config.Namespace)
 }
 
-func startShell(pod string, namespace *string) {
-	cmd := exec.Command(os.Getenv("SHELL"), "-c", "kubectl exec -n "+*namespace+" -ti "+pod+" -- /bin/"+*config.Shell)
+func startShell(pod, container string, namespace *string) {
+	cmd := exec.Command(os.Getenv("SHELL"), "-c", "kubectl attach "+pod+" -n "+*namespace+" -t -i -c "+*namespace+"-"+container+"-exec")
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	err := cmd.Run()
-	if err != nil && *config.Shell != "sh" {
-		fmt.Println("-- fallback to \"sh\" shell -- ")
-		s := "sh"
-		config.Shell = &s
-		startShell(pod, namespace)
+	if err != nil {
+		fmt.Println(err)
 	}
 }
