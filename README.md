@@ -6,7 +6,6 @@ You can also set these parameters for customization of the duplicata:
  - `cpu`
  - `memory`
  - `ttl`
- - `shell`
 
 Already created duplicatas remain 4h (by default) and you can exec into them as long they're running.
 
@@ -33,7 +32,6 @@ Flags:
   -t, --ttl=14400            Time to live of pods is seconds
   -n, --namespace="default"  Namespace
   -p, --pod=POD              Pod
-  -s, --shell="sh"           Shell to use
   -c, --cpu=CPU              cpu
   -m, --memory=MEMORY        Memory
   -k, --kubeconfig=$HOME/.kube/config  
