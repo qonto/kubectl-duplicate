@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
+	"github.com/briandowns/spinner"
 	cfg "github.com/qonto/kubectl-duplicate/pkg/config"
 	"github.com/qonto/kubectl-duplicate/pkg/create"
 	"github.com/qonto/kubectl-duplicate/pkg/find"
@@ -22,12 +25,12 @@ var version string
 var commit string
 
 func init() {
-	allnamespaces := kingpin.Flag("all-namespaces", "All Namespace").Bool()
-	config.TTL = kingpin.Flag("ttl", "Time to live of pods is seconds").Short('t').Default("14400").Int32()
-	config.Namespace = kingpin.Flag("namespace", "Namespace").Short('n').Default("default").String()
-	config.Pod = kingpin.Flag("pod", "Pod").Short('p').String()
-	config.CPU = kingpin.Flag("cpu", "cpu").Short('c').String()
-	config.Memory = kingpin.Flag("memory", "Memory").Short('m').String()
+	allnamespaces := kingpin.Flag("all-namespaces", "All Namespaces").Bool()
+	config.TTL = kingpin.Flag("ttl", "Time to live of pod in seconds").Short('t').Default("14400").Int32()
+	config.Namespace = kingpin.Flag("namespace", "Namespace of the pod we want to duplicate").Short('n').Default("default").String()
+	config.Pod = kingpin.Flag("pod", "Pod to duplicate").Short('p').String()
+	config.CPU = kingpin.Flag("cpu", "CPU Request for the duplicated Pod").Short('c').String()
+	config.Memory = kingpin.Flag("memory", "Memory Request for the duplicated Pod").Short('m').String()
 	config.Kubeconfig = kingpin.Flag("kubeconfig", "Kube config file (override by env var KUBECONFIG").Short('k').Default(os.Getenv("HOME") + "/.kube/config").ExistingFile()
 	v := kingpin.Flag("version", "Print version").Short('v').Bool()
 	kingpin.Parse()
@@ -61,16 +64,25 @@ func main() {
 	pod := selector.Pod(pods, *config.Pod)
 	container := selector.Container(pod)
 
+	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	if _, present := pod.ObjectMeta.Labels["job-name"]; !present {
 		deployment := find.Deployment(list.Deployments(clientset, config), pod)
 		result, err := create.Job(clientset, config, deployment, container)
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			os.Exit(1)
 		}
 		jobName := result.ObjectMeta.Name
 
-		watch.Pod(clientset, config, jobName) //wait until Pod is running
-		pod = selector.Pod(list.Pods(clientset, config), result.Name)
+		s := spinner.New(spinner.CharSets[26], 500*time.Millisecond)
+		s.Start()
+		watch.Job(ctx, clientset, config, jobName) //wait until Job is created
+		watch.Pod(ctx, clientset, config, jobName) //wait until Pod is running
+		pod = selector.Pod(list.PodsForJob(clientset, config, jobName), result.Name)
+		s.Stop()
 	}
 
 	startShell(pod.Name, container.Name, config.Namespace)
@@ -84,5 +96,6 @@ func startShell(pod, container string, namespace *string) {
 	err := cmd.Run()
 	if err != nil {
 		fmt.Println(err)
+		os.Exit(1)
 	}
 }
